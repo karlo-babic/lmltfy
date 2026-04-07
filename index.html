@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Let Me LLM That For You</title>
+    <style>
+        :root {
+            --primary: #4F46E5;
+            --primary-hover: #4338CA;
+            --bg: #F9FAFB;
+            --text: #111827;
+            --box-bg: #FFFFFF;
+            --border: #D1D5DB;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            text-align: center;
+            width: 100%;
+            max-width: 600px;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 2rem;
+            font-weight: 800;
+            background: linear-gradient(to right, #4F46E5, #EC4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .search-wrapper {
+            position: relative;
+            margin-bottom: 2rem;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 15px 20px;
+            font-size: 1.2rem;
+            border: 2px solid var(--border);
+            border-radius: 9999px;
+            outline: none;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            box-sizing: border-box;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
+        }
+
+        .buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 1rem;
+            font-weight: 600;
+            color: white;
+            background-color: var(--primary);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        button:hover {
+            background-color: var(--primary-hover);
+        }
+
+        button.secondary {
+            background-color: var(--box-bg);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        button.secondary:hover {
+            background-color: #F3F4F6;
+        }
+
+        #link-container {
+            margin-top: 2rem;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            animation: fadeIn 0.5s ease;
+        }
+
+        #generated-link {
+            padding: 10px;
+            background: var(--box-bg);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            width: 100%;
+            word-break: break-all;
+            font-family: monospace;
+        }
+
+        #message-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            font-weight: bold;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+            z-index: 10000;
+        }
+
+        /* The fake cursor */
+        #cursor {
+            position: fixed;
+            top: 100%;
+            left: 50%;
+            width: 24px;
+            height: 36px;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='36' viewBox='0 0 24 36'%3E%3Cpath fill='%23000' stroke='%23FFF' stroke-width='1.5' d='M1 1l16 16h-7l5 11-4 2-5-11-6 6z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-size: contain;
+            z-index: 9999;
+            pointer-events: none;
+            display: none;
+            /* Transition applied via JS to ensure smooth movement */
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Let Me LLM That For You</h1>
+        
+        <div class="search-wrapper">
+            <input type="text" id="search-box" placeholder="Enter your prompt or query here..." autocomplete="off">
+        </div>
+
+        <div class="buttons">
+            <button id="btn-search">Let Me LLM That</button>
+            <button id="btn-link" class="secondary">Generate Link</button>
+        </div>
+
+        <div id="link-container">
+            <p>Share this link with your friend:</p>
+            <input type="text" id="generated-link" readonly>
+            <button id="btn-copy" class="secondary">Copy Link</button>
+        </div>
+    </div>
+
+    <div id="cursor"></div>
+    <div id="message-overlay">Was that so hard?</div>
+
+    <script>
+        // Utility for timing
+        const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+        // Elements
+        const searchBox = document.getElementById('search-box');
+        const btnSearch = document.getElementById('btn-search');
+        const btnLink = document.getElementById('btn-link');
+        const linkContainer = document.getElementById('link-container');
+        const generatedLink = document.getElementById('generated-link');
+        const btnCopy = document.getElementById('btn-copy');
+        const cursor = document.getElementById('cursor');
+        const messageOverlay = document.getElementById('message-overlay');
+
+        // Parse URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const query = urlParams.get('q');
+
+        if (query) {
+            // VIEWER MODE: Animate and redirect
+            btnLink.style.display = 'none'; // Hide generate link button
+            searchBox.disabled = true; // Prevent real user interference
+            btnSearch.disabled = true;
+            runAnimation(query);
+        } else {
+            // CREATOR MODE: Bind button events
+            btnSearch.addEventListener('click', () => {
+                if(searchBox.value.trim()) {
+                    redirectToLLM(searchBox.value.trim());
+                }
+            });
+
+            btnLink.addEventListener('click', () => {
+                const val = searchBox.value.trim();
+                if (!val) {
+                    alert("Please enter a prompt first!");
+                    return;
+                }
+                const url = new URL(window.location.href);
+                url.searchParams.set('q', val);
+                generatedLink.value = url.toString();
+                linkContainer.style.display = 'flex';
+            });
+
+            btnCopy.addEventListener('click', () => {
+                generatedLink.select();
+                document.execCommand('copy');
+                btnCopy.innerText = "Copied!";
+                setTimeout(() => btnCopy.innerText = "Copy Link", 2000);
+            });
+        }
+
+        // The main redirect function
+        function redirectToLLM(q) {
+            const encodedQuery = encodeURIComponent(q);
+            window.location.href = `https://www.google.com/search?q=${encodedQuery}&udm=50`;
+        }
+
+        // The LMGTFY Style Animation Sequence
+        async function runAnimation(q) {
+            cursor.style.display = 'block';
+            
+            // Start cursor slightly off screen bottom-right
+            cursor.style.left = (window.innerWidth * 0.8) + 'px';
+            cursor.style.top = (window.innerHeight + 50) + 'px';
+            
+            await sleep(500);
+
+            // Enable transition for smooth movement
+            cursor.style.transition = 'all 1.5s cubic-bezier(0.25, 1, 0.5, 1)';
+
+            // Move to search box
+            const boxRect = searchBox.getBoundingClientRect();
+            cursor.style.left = (boxRect.left + (boxRect.width / 2)) + 'px';
+            cursor.style.top = (boxRect.top + (boxRect.height / 2)) + 'px';
+
+            await sleep(1600); // Wait for movement to finish
+
+            // Simulate Click on Input
+            cursor.style.transform = 'scale(0.8)'; // mouse down
+            await sleep(150);
+            cursor.style.transform = 'scale(1)';   // mouse up
+            searchBox.disabled = false;
+            searchBox.focus();
+            
+            await sleep(500);
+
+            // Type out the query
+            for (let i = 0; i < q.length; i++) {
+                searchBox.value += q.charAt(i);
+                // Random typing speed between 50ms and 150ms
+                await sleep(50 + Math.random() * 100);
+            }
+
+            await sleep(600);
+
+            // Move to Search Button
+            cursor.style.transition = 'all 1s cubic-bezier(0.25, 1, 0.5, 1)';
+            const btnRect = btnSearch.getBoundingClientRect();
+            cursor.style.left = (btnRect.left + (btnRect.width / 2)) + 'px';
+            cursor.style.top = (btnRect.top + (btnRect.height / 2)) + 'px';
+
+            await sleep(1100);
+
+            // Simulate Click on Button
+            cursor.style.transform = 'scale(0.8)';
+            btnSearch.style.backgroundColor = 'var(--primary-hover)';
+            await sleep(150);
+            cursor.style.transform = 'scale(1)';
+            btnSearch.style.backgroundColor = 'var(--primary)';
+
+            await sleep(300);
+
+            // Show Snarky Overlay
+            messageOverlay.style.opacity = '1';
+            
+            await sleep(2000);
+
+            // Finally, Redirect
+            redirectToLLM(q);
+        }
+    </script>
+</body>
+</html>
