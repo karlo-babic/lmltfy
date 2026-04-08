@@ -216,10 +216,13 @@
         const cursor = document.getElementById('cursor');
         const messageOverlay = document.getElementById('message-overlay');
 
-        // Parse URL looking for 'id' instead of 'q'
+        // Parse URL looking for either 'q' (raw) or 'id' (obfuscated)
         const urlParams = new URLSearchParams(window.location.search);
+        const rawQ = urlParams.get('q');
         const rawId = urlParams.get('id');
-        const query = rawId ? decodeQuery(rawId) : null;
+        
+        // If 'q' exists, use it directly. Otherwise, try to decode 'id'.
+        const query = rawQ ? rawQ : (rawId ? decodeQuery(rawId) : null);
 
         if (query) {
             // VIEWER MODE: Animate and redirect
