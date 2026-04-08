@@ -183,6 +183,29 @@
         // Utility for timing
         const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
+        // Obfuscation Helpers (+1 Shift)
+        function encodeQuery(str) {
+            let shifted = "";
+            for (let i = 0; i < str.length; i++) {
+                shifted += String.fromCharCode(str.charCodeAt(i) + 1);
+            }
+            // URL encode to ensure symbols don't break the URL parameters
+            return encodeURIComponent(shifted);
+        }
+
+        function decodeQuery(str) {
+            try {
+                let unescaped = decodeURIComponent(str);
+                let unshifted = "";
+                for (let i = 0; i < unescaped.length; i++) {
+                    unshifted += String.fromCharCode(unescaped.charCodeAt(i) - 1);
+                }
+                return unshifted;
+            } catch (e) {
+                return null; // Fallback if URL was tampered with
+            }
+        }
+
         // Elements
         const searchBox = document.getElementById('search-box');
         const btnSearch = document.getElementById('btn-search');
@@ -193,9 +216,10 @@
         const cursor = document.getElementById('cursor');
         const messageOverlay = document.getElementById('message-overlay');
 
-        // Parse URL
+        // Parse URL looking for 'id' instead of 'q'
         const urlParams = new URLSearchParams(window.location.search);
-        const query = urlParams.get('q');
+        const rawId = urlParams.get('id');
+        const query = rawId ? decodeQuery(rawId) : null;
 
         if (query) {
             // VIEWER MODE: Animate and redirect
@@ -218,7 +242,9 @@
                     return;
                 }
                 const url = new URL(window.location.href);
-                url.searchParams.set('q', val);
+                // Clear any old parameters and set the shifted ID
+                url.searchParams.delete('q'); 
+                url.searchParams.set('id', encodeQuery(val));
                 generatedLink.value = url.toString();
                 linkContainer.style.display = 'flex';
             });
@@ -237,7 +263,7 @@
             window.location.href = `https://www.google.com/search?q=${encodedQuery}&udm=50`;
         }
 
-        // The LMGTFY Style Animation Sequence
+        // The Animation Sequence
         async function runAnimation(q) {
             cursor.style.display = 'block';
             
