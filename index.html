@@ -298,6 +298,9 @@
             // Type out the query
             for (let i = 0; i < q.length; i++) {
                 searchBox.value += q.charAt(i);
+                // Keep the caret and the end of the text in view
+                searchBox.setSelectionRange(searchBox.value.length, searchBox.value.length);
+                searchBox.scrollLeft = searchBox.scrollWidth;
                 // Random typing speed between 50ms and 150ms
                 await sleep(50 + Math.random() * 100);
             }
